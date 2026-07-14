@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Virtual Environment
+.venv/
+env/
+
+# Environment Variables
+.env
+
+# Node
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Docker
+*.env.local
+
+# Database
+*.sqlite3
+
+# Misc
+*.swp
