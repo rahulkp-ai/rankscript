@@ -1,0 +1,117 @@
+# =============================================
+#   RankScript — Docker Compose
+#   Dev:  docker-compose up --build
+#   Prod: set ENVIRONMENT=production in .env
+# =============================================
+
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rankscript_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-True}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      # Backend can reach DB and Redis via service names on the Docker network
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    networks:
+      - rankscript_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rankscript_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      # Frontend on Docker network can reach backend via service name
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - rankscript_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: rankscript_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/00_schema.sql:/docker-entrypoint-initdb.d/00_schema.sql
+      - ./database/seed_data.sql:/docker-entrypoint-initdb.d/seed_data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rankscript_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: rankscript_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rankscript_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: rankscript_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@rankscript.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-changeme}
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - rankscript_network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  rankscript_network:
+    driver: bridge
