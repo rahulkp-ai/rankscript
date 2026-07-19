@@ -3,11 +3,9 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
-const API = "http://localhost:8000";
-
 export const handlers = [
   // Auth
-  http.post(`${API}/auth/login`, async ({ request }) => {
+  http.post("/api/auth/login", async ({ request }) => {
     const body = (await request.json()) as Record<string, string>;
     if (body.email === "test@test.com" && body.password === "password") {
       return HttpResponse.json({
@@ -22,7 +20,7 @@ export const handlers = [
     );
   }),
 
-  http.post(`${API}/auth/register`, async ({ request }) => {
+  http.post("/api/auth/register", async ({ request }) => {
     const body = (await request.json()) as Record<string, string>;
     if (body.email === "existing@test.com") {
       return HttpResponse.json(
@@ -38,11 +36,16 @@ export const handlers = [
       xp: 0,
       rank_score: 0,
       is_verified: false,
+      is_active: true,
+      state: null,
+      district: null,
+      country: null,
+      avatar_url: null,
       created_at: "2024-01-01T00:00:00Z",
     });
   }),
 
-  http.get(`${API}/users/me`, ({ request }) => {
+  http.get("/api/users/me", ({ request }) => {
     const auth = request.headers.get("Authorization");
     if (auth === "Bearer fake-access-token") {
       return HttpResponse.json({
@@ -53,6 +56,11 @@ export const handlers = [
         xp: 100,
         rank_score: 50.5,
         is_verified: true,
+        is_active: true,
+        state: null,
+        district: null,
+        country: null,
+        avatar_url: null,
         created_at: "2024-01-01T00:00:00Z",
       });
     }
@@ -62,7 +70,7 @@ export const handlers = [
     );
   }),
 
-  http.post(`${API}/auth/refresh`, async ({ request }) => {
+  http.post("/api/auth/refresh", async ({ request }) => {
     const body = (await request.json()) as Record<string, string>;
     if (body.refresh_token === "fake-refresh-token") {
       return HttpResponse.json({
@@ -78,7 +86,7 @@ export const handlers = [
   }),
 
   // Courses
-  http.get(`${API}/courses`, () => {
+  http.get("/api/courses", () => {
     return HttpResponse.json({
       courses: [
         {
@@ -100,7 +108,7 @@ export const handlers = [
     });
   }),
 
-  http.get(`${API}/courses/:id`, ({ params }) => {
+  http.get("/api/courses/:id", ({ params }) => {
     if (params.id === "course-1") {
       return HttpResponse.json({
         id: "course-1",
@@ -123,7 +131,7 @@ export const handlers = [
     );
   }),
 
-  http.get(`${API}/courses/:id/lessons`, ({ request }) => {
+  http.get("/api/courses/:id/lessons", ({ request }) => {
     const auth = request.headers.get("Authorization");
     if (!auth) {
       return HttpResponse.json(
