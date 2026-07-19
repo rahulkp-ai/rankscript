@@ -379,5 +379,3 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ## Contact
 
 **RAHUL KP KURUP**
-
-Project Link: [https://github.com/rahulkpkurup/RankScript](https://github.com/rahulkpkurup/RankScript)
