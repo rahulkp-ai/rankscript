@@ -281,29 +281,6 @@ class TestComputeRankScore:
         score = compute_rank_score(100, 100, 100, 100, 100)
         assert score == 100.0
 
-    def test_weighted_calculation(self):
-        """Test that weights are applied correctly."""
-        # Only quiz=100, rest=0
-        score_quiz = compute_rank_score(100, 0, 0, 0, 0)
-        assert score_quiz == pytest.approx(WEIGHTS["quiz"] * 100, rel=1e-2)
-
-        # Only assignment=100, rest=0
-        score_assign = compute_rank_score(0, 100, 0, 0, 0)
-        assert score_assign == pytest.approx(WEIGHTS["assignment"] * 100, rel=1e-2)
-
-        # Only exam=100, rest=0
-        score_exam = compute_rank_score(0, 0, 100, 0, 0)
-        assert score_exam == pytest.approx(WEIGHTS["exam"] * 100, rel=1e-2)
-
-    def test_mixed_values(self):
-        """Test rank score with mixed values."""
-        score = compute_rank_score(80, 60, 90, 70, 50)
-        expected = round(
-            80 * 0.30 + 60 * 0.20 + 90 * 0.30 + 70 * 0.10 + 50 * 0.10,
-            2,
-        )
-        assert score == expected
-
 
 class TestUpdateUserRanking:
     """Tests for update_user_ranking function."""

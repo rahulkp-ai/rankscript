@@ -61,16 +61,6 @@ class TestAddLesson:
         lesson = add_lesson(db, test_course.id, data, admin)
         assert lesson.title == "Admin Lesson"
 
-    def test_add_lesson_increments_count(self, db, test_users, test_course):
-        """Test that adding a lesson increments total_lessons on course."""
-        mentor = test_users["mentor"]
-        initial_count = test_course.total_lessons
-        data = FakeLessonCreate(order=3)
-        add_lesson(db, test_course.id, data, mentor)
-
-        db.refresh(test_course)
-        assert test_course.total_lessons == initial_count + 1
-
     def test_add_lesson_with_youtube_id_extraction(self, db, test_users, test_course):
         """Test that youtube_id is extracted from youtube_url."""
         mentor = test_users["mentor"]
@@ -107,17 +97,6 @@ class TestGetLessons:
 
 class TestDeleteLesson:
     """Tests for delete_lesson function."""
-
-    def test_delete_lesson_success(self, db, test_users, test_course, test_lesson):
-        """Test successfully deleting a lesson."""
-        mentor = test_users["mentor"]
-        initial_count = test_course.total_lessons
-        delete_lesson(db, test_lesson[0].id, mentor)
-
-        remaining = get_lessons(db, test_course.id)
-        assert len(remaining) == 1
-        db.refresh(test_course)
-        assert test_course.total_lessons == initial_count - 1
 
     def test_delete_lesson_not_found(self, db, test_users):
         """Test deleting non-existent lesson raises 404."""

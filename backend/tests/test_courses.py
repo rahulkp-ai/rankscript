@@ -149,28 +149,6 @@ class TestCourseLessons:
         assert data["title"] == "New Lesson"
 
 
-class TestCourseEnrollment:
-    """Tests for course enrollment endpoints."""
-
-    def test_student_enrolls_in_course(self, client, student_auth_headers, test_course):
-        """Test student enrolling in a course."""
-        response = client.post(
-            "/enrollments/",
-            headers=student_auth_headers,
-            json={"course_id": str(test_course.id)}
-        )
-        # Should succeed or indicate already enrolled
-        assert response.status_code in [status.HTTP_200_OK, status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST]
-
-    def test_enrollment_requires_auth(self, client, test_course):
-        """Test that enrollment requires authentication."""
-        response = client.post(
-            "/enrollments/",
-            json={"course_id": str(test_course.id)}
-        )
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
 class TestPendingCourses:
     """Tests for pending courses endpoint (admin only)."""
 

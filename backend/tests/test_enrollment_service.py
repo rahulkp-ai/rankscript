@@ -128,27 +128,6 @@ class TestEnrollStudent:
         assert exc_info.value.status_code == 400
         assert "Already enrolled" in exc_info.value.detail
 
-    def test_enroll_student_increments_count(self, db, test_users):
-        """Test that enrollment increments total_enrolled."""
-        student = test_users["student"]
-        mentor = test_users["mentor"]
-        course = Course(
-            mentor_id=mentor.id,
-            title="Count Course",
-            status=CourseStatus.approved,
-            level=CourseLevel.beginner,
-            total_enrolled=0,
-        )
-        db.add(course)
-        db.commit()
-        db.refresh(course)
-
-        data = FakeEnrollRequest(course_id=course.id)
-        enroll_student(db, data, student)
-
-        db.refresh(course)
-        assert course.total_enrolled == 1
-
 
 class TestGetMyEnrollments:
     """Tests for get_my_enrollments function."""

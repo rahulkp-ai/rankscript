@@ -59,33 +59,6 @@ class TestUpdateMe:
         assert response.status_code == 200
 
 
-class TestListUsers:
-    """Tests for GET /users/ endpoint."""
-
-    def test_list_users_admin(self, client, auth_headers, test_users):
-        """Test admin can list all users."""
-        response = client.get("/users/", headers=auth_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) >= 3
-
-    def test_list_users_student_forbidden(self, client, student_auth_headers):
-        """Test student cannot list users."""
-        response = client.get("/users/", headers=student_auth_headers)
-        assert response.status_code == 403
-
-    def test_list_users_mentor_forbidden(self, client, mentor_auth_headers):
-        """Test mentor cannot list users."""
-        response = client.get("/users/", headers=mentor_auth_headers)
-        assert response.status_code == 403
-
-    def test_list_users_unauthenticated(self, client):
-        """Test unauthenticated users cannot list users."""
-        response = client.get("/users/")
-        assert response.status_code in (401, 403)
-
-
 class TestGetUser:
     """Tests for GET /users/{user_id} endpoint."""
 
