@@ -1,0 +1,48 @@
+# =============================================================
+#  RankScript — Render Blueprint (zero-cost deploy)
+#
+#  Deploys the FastAPI backend as a free Docker web service.
+#
+#  Usage:
+#    1. Copy this file to the REPO ROOT as `render.yaml`
+#       (Render Blueprints must live at the repo root, not in /deploy)
+#    2. Push to GitHub
+#    3. On dashboard.render.com -> New -> Blueprint -> select this repo
+#    4. Render reads this file and creates the service automatically
+#    5. Fill in the "sync: false" env vars in the dashboard (DATABASE_URL,
+#       REDIS_URL, SECRET_KEY, ALLOWED_ORIGINS) — these are secrets and
+#       are deliberately NOT stored in this file.
+#
+#  You can also skip this file entirely and create the Web Service by
+#  hand in the Render dashboard — see deploy/DEPLOY_GUIDE.md Step 3.
+# =============================================================
+
+services:
+  - type: web
+    name: rankscript-backend
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      # ---- Secrets: set these manually in the Render dashboard ----
+      - key: DATABASE_URL       # Neon Postgres connection string (postgresql://...)
+        sync: false
+      - key: REDIS_URL          # Upstash Redis connection string (rediss://...)
+        sync: false
+      - key: SECRET_KEY         # generate: python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+        sync: false
+      - key: ALLOWED_ORIGINS    # your Vercel frontend URL, e.g. https://rankscript.vercel.app
+        sync: false
