@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: rankscript-backend
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      # ---- Secrets: set these manually in the Render dashboard ----
+      - key: DATABASE_URL # Neon Postgres connection string (postgresql://...)
+        sync: false
+      - key: REDIS_URL # Upstash Redis connection string (rediss://...)
+        sync: false
+      - key: SECRET_KEY # generate: python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+        sync: false
+      - key: ALLOWED_ORIGINS # your Vercel frontend URL, e.g. https://rankscript.vercel.app
+        sync: false
