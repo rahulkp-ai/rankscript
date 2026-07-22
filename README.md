@@ -3,15 +3,31 @@
 <div align="center">
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/rahulkpkurup/RankScript)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/rahulkp-ai/rankscript)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://rankscript.vercel.app)
 
 _A competitive learning platform where students battle for top spots on district, state, and national leaderboards — while mentors guide the way._
 
-[Features](#features) • [Quick Start](#quick-start) • [Usage](#usage) • [API Reference](#api-reference) • [Contributing](#contributing)
+[Live Demo](https://rankscript.vercel.app/auth/login) • [Features](#features) • [Architecture](#system-architecture) • [Quick Start](#quick-start) • [API Reference](#api-reference) • [Deployment](#deployment-zero-cost-stack)
 
 </div>
+
+---
+
+## Live Demo
+
+|                           |                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| **Frontend**              | [rankscript.vercel.app](https://rankscript.vercel.app)                       |
+| **Login**                 | [rankscript.vercel.app/auth/login](https://rankscript.vercel.app/auth/login) |
+| **Backend API (Swagger)** | `https://<your-render-service>.onrender.com/docs`                            |
+
+> Hosted entirely on free tiers (Vercel + Render + Neon + Upstash). The backend spins down after 15 minutes of inactivity — if a page feels slow on first load, that's the free-tier API waking up (10–30s), not a bug.
 
 ---
 
@@ -45,6 +61,184 @@ RankScript is a full-stack competitive learning platform built for students and 
 
 ---
 
+## System Architecture
+
+### High-level component architecture
+
+```mermaid
+graph TB
+    subgraph Client["Client Layer"]
+        Browser["Browser<br/>(Student / Mentor / Admin)"]
+    end
+
+    subgraph Frontend["Frontend — Next.js 14 App Router"]
+        Pages["Pages<br/>(admin / mentor / student / auth)"]
+        Components["Components<br/>(course, quiz, ranking, analytics)"]
+        AuthCtx["AuthContext + useAuth hook"]
+        Services["Service layer<br/>(axios, one file per API domain)"]
+        Rewrite["next.config.js<br/>/api/* rewrite proxy"]
+    end
+
+    subgraph Backend["Backend — FastAPI"]
+        Routes["10 Routers<br/>(auth, users, courses, lessons,<br/>enrollments, quizzes, assignments,<br/>ranking, analytics, admin)"]
+        Deps["deps.py<br/>JWT auth + role guards"]
+        ServicesB["9 Services<br/>(business logic layer)"]
+        Models["11 SQLAlchemy Models"]
+    end
+
+    subgraph Data["Data Layer"]
+        Postgres[("PostgreSQL 15<br/>11 tables + mv_leaderboard")]
+        Redis[("Redis 7<br/>cache")]
+    end
+
+    Browser -->|HTTPS| Pages
+    Pages --> Components
+    Pages --> AuthCtx
+    Components --> Services
+    Services --> Rewrite
+    Rewrite -->|proxied request| Routes
+    Routes --> Deps
+    Deps --> ServicesB
+    ServicesB --> Models
+    Models -->|SQLAlchemy ORM| Postgres
+    ServicesB -.->|cache reads/writes| Redis
+
+    style Client fill:#1e293b,color:#fff
+    style Frontend fill:#0f172a,color:#fff
+    style Backend fill:#052e16,color:#fff
+    style Data fill:#1e1b4b,color:#fff
+```
+
+### Layered backend design
+
+Every domain (users, courses, lessons, enrollments, quizzes, assignments, ranking, analytics, admin) follows the same strict layering — routes never touch the database directly:
+
+```mermaid
+flowchart LR
+    A["Route<br/>(HTTP + validation)"] --> B["Service<br/>(business logic)"]
+    B --> C["Model<br/>(SQLAlchemy ORM)"]
+    C --> D[("PostgreSQL")]
+    E["Schema<br/>(Pydantic in/out)"] -.validates.-> A
+    E -.validates.-> B
+```
+
+---
+
+## Data Flow
+
+### Request lifecycle (production)
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant V as Vercel (Next.js server)
+    participant R as Render (FastAPI backend)
+    participant N as Neon (PostgreSQL)
+    participant UP as Upstash (Redis)
+
+    U->>V: GET rankscript.vercel.app
+    V-->>U: Rendered page (SSR/CSR)
+    U->>V: fetch /api/courses
+    V->>R: proxy to GET /courses
+    R->>R: JWT validation (deps.py)
+    R->>N: SELECT ... FROM courses
+    N-->>R: rows
+    R->>UP: cache leaderboard reads (if applicable)
+    UP-->>R: cached value or miss
+    R-->>V: JSON response
+    V-->>U: JSON response (same-origin, no CORS)
+```
+
+### Ranking / leaderboard pipeline
+
+The core differentiator of RankScript — how raw activity becomes a leaderboard position:
+
+```mermaid
+flowchart TD
+    QA["quiz_attempts<br/>(scored on submit)"] --> W1["Quiz Score x 40%"]
+    SUB["submissions<br/>(graded by mentor)"] --> W2["Assignment Score x 30%"]
+    ENR["enrollments<br/>(lesson progress %)"] --> W3["Completion Score x 15%"]
+    ACT["daily activity log"] --> W4["Streak Score x 15%"]
+
+    W1 --> SUM["ranking_service.calculate_rank_score()"]
+    W2 --> SUM
+    W3 --> SUM
+    W4 --> SUM
+
+    SUM --> RE[("rank_entries<br/>source of truth")]
+    RE --> MV[("mv_leaderboard<br/>materialized view")]
+    MV --> API1["GET /ranking/leaderboard"]
+    MV --> API2["GET /ranking/leaderboard/state/:state"]
+    MV --> API3["GET /ranking/leaderboard/district/:district"]
+    MV --> API4["GET /ranking/my-rank"]
+```
+
+### Authentication flow (JWT access/refresh)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Backend
+
+    U->>F: Submit login form
+    F->>B: POST /auth/login
+    B->>B: Verify password (bcrypt)
+    B-->>F: access_token (30 min) + refresh_token (7 days)
+    F->>F: Store tokens (AuthContext)
+    F->>B: Authenticated requests (Authorization: Bearer access_token)
+    B->>B: deps.get_current_user() validates JWT + role
+    Note over F,B: When access_token expires
+    F->>B: POST /auth/refresh (refresh_token)
+    B-->>F: new access_token
+```
+
+---
+
+## Database Schema (Entity Relationship)
+
+```mermaid
+erDiagram
+    USERS ||--o{ COURSES : "creates (mentor)"
+    USERS ||--o{ ENROLLMENTS : "enrolls"
+    USERS ||--o{ QUIZ_ATTEMPTS : "attempts"
+    USERS ||--o{ SUBMISSIONS : "submits"
+    USERS ||--o{ RANK_ENTRIES : "has"
+    USERS ||--o{ AUDIT_LOGS : "performs (admin)"
+
+    COURSES ||--o{ LESSONS : "contains"
+    COURSES ||--o{ ENROLLMENTS : "has"
+    COURSES ||--o{ QUIZZES : "has"
+    COURSES ||--o{ ASSIGNMENTS : "has"
+
+    QUIZZES ||--o{ QUESTIONS : "contains"
+    QUIZZES ||--o{ QUIZ_ATTEMPTS : "recorded in"
+
+    ASSIGNMENTS ||--o{ SUBMISSIONS : "receives"
+
+    USERS {
+        uuid id PK
+        string role
+        string email
+        int xp
+        int streak_days
+    }
+    COURSES {
+        uuid id PK
+        uuid mentor_id FK
+        string status
+    }
+    RANK_ENTRIES {
+        uuid id PK
+        uuid user_id FK
+        float rank_score
+        string district
+        string state
+    }
+```
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -57,8 +251,8 @@ RankScript is a full-stack competitive learning platform built for students and 
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/rahulkpkurup/RankScript.git
-   cd RankScript
+   git clone https://github.com/rahulkp-ai/rankscript.git
+   cd rankscript
    ```
 
 2. **Set up environment variables**
@@ -119,6 +313,37 @@ psql -U postgres -d rankscript -f database/seed_data.sql
 
 ---
 
+## Deployment (Zero-Cost Stack)
+
+RankScript's production deployment runs entirely on free tiers:
+
+```mermaid
+graph LR
+    GH["GitHub<br/>(source + Actions CI)"] -->|auto-deploy on push| VC["Vercel<br/>(Next.js frontend)"]
+    GH -->|auto-deploy on push| RD["Render<br/>(FastAPI backend, Docker)"]
+    RD --> NE[("Neon<br/>PostgreSQL 15")]
+    RD --> UP[("Upstash<br/>Redis")]
+    VC -->|proxy /api/*| RD
+
+    style GH fill:#24292e,color:#fff
+    style VC fill:#000,color:#fff
+    style RD fill:#46e3b7,color:#000
+    style NE fill:#00e599,color:#000
+    style UP fill:#00e9a3,color:#000
+```
+
+| Component | Service                        | Free tier                                      |
+| --------- | ------------------------------ | ---------------------------------------------- |
+| Frontend  | [Vercel](https://vercel.com)   | No sleep, instant cold start                   |
+| Backend   | [Render](https://render.com)   | Docker web service, sleeps after 15 min idle   |
+| Database  | [Neon](https://neon.tech)      | Serverless Postgres 15, autosuspends when idle |
+| Cache     | [Upstash](https://upstash.com) | Redis, 10,000 commands/day                     |
+| CI        | GitHub Actions                 | Free for public repos                          |
+
+Full step-by-step deployment instructions live in [`deploy/DEPLOY_GUIDE.md`](deploy/DEPLOY_GUIDE.md).
+
+---
+
 ## Usage
 
 ### Ranking Formula
@@ -176,7 +401,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ## API Reference
 
-All endpoints are served under `http://localhost:8000`. Interactive docs at `/docs`.
+All endpoints are served under `http://localhost:8000` (local) or your deployed Render URL. Interactive docs at `/docs`.
 
 ### Auth
 
@@ -252,7 +477,7 @@ All endpoints are served under `http://localhost:8000`. Interactive docs at `/do
 ## Project Structure
 
 ```
-RankScript/
+rankscript/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
@@ -279,9 +504,9 @@ RankScript/
 │   │   │   └── student/        # Student dashboard
 │   │   ├── components/         # Reusable UI components
 │   │   ├── context/            # React context (auth, etc.)
-│   │   ├── hooks/              # Custom React hooks
+│   │   ├── hooks/               # Custom React hooks
 │   │   ├── lib/                # Utilities, axios instance
-│   │   ├── services/           # API service layer (10 services)
+│   │   ├── services/            # API service layer (10 services)
 │   │   └── test/               # Vitest test setup
 │   ├── Dockerfile
 │   ├── package.json
@@ -293,6 +518,11 @@ RankScript/
 │   └── seed_data.sql           # Seed data
 ├── redis/
 │   └── redis.conf              # Redis configuration
+├── deploy/                     # Zero-cost deployment configs and guide
+│   ├── render.yaml
+│   ├── next.config.js
+│   ├── DEPLOY_GUIDE.md
+│   └── ...
 ├── docker-compose.yml          # 5 services: backend, frontend, db, redis, pgadmin
 ├── rebuild.sh                  # Clean rebuild script
 ├── .env.example                # Environment variable template
@@ -305,13 +535,13 @@ RankScript/
 
 | Layer              | Technology                                                           |
 | ------------------ | -------------------------------------------------------------------- |
-| **Backend**        | Python 3.11, FastAPI, SQLAlchemy, Alembic                            |
+| **Backend**        | Python 3.11, FastAPI, SQLAlchemy                                     |
 | **Frontend**       | Next.js 14, React 18, TypeScript, Tailwind CSS                       |
-| **Database**       | PostgreSQL 15                                                        |
-| **Cache**          | Redis 7                                                              |
+| **Database**       | PostgreSQL 15 (Neon in production)                                   |
+| **Cache**          | Redis 7 (Upstash in production)                                      |
 | **Auth**           | JWT (python-jose), bcrypt                                            |
 | **Testing**        | pytest, pytest-asyncio (backend); Vitest, Testing Library (frontend) |
-| **Infrastructure** | Docker, Docker Compose                                               |
+| **Infrastructure** | Docker, Docker Compose (local) · Render + Vercel (production)        |
 | **Storage**        | S3-compatible (boto3) for file uploads                               |
 
 ---
@@ -348,9 +578,8 @@ Plus a materialized view (`mv_leaderboard`) for fast leaderboard pagination.
 - [x] Regional leaderboards (district, state, national)
 - [x] Admin approval workflows
 - [x] Docker containerization
-- [ ] Fix frontend build issues
-- [ ] Comprehensive frontend test coverage
-- [ ] CI/CD pipeline
+- [x] Zero-cost production deployment (Vercel + Render + Neon + Upstash)
+- [x] CI/CD pipeline
 - [ ] Email notifications (fastapi-mail integration)
 - [ ] Google OAuth
 - [ ] Real-time leaderboard updates (WebSockets)
@@ -378,4 +607,8 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-**RAHUL KP KURUP**
+**RAHUL KP**
+
+- GitHub: [@rahulkp-ai](https://github.com/rahulkp-ai)
+- Project Link: [github.com/rahulkp-ai/rankscript](https://github.com/rahulkp-ai/rankscript)
+- Live Demo: [rankscript.vercel.app](https://rankscript.vercel.app)
