@@ -25,9 +25,29 @@ _A competitive learning platform where students battle for top spots on district
 | ------------------------- | ---------------------------------------------------------------------------- |
 | **Frontend**              | [rankscript.vercel.app](https://rankscript.vercel.app)                       |
 | **Login**                 | [rankscript.vercel.app/auth/login](https://rankscript.vercel.app/auth/login) |
-| **Backend API (Swagger)** | `https://<your-render-service>.onrender.com/docs`                            |
 
 > Hosted entirely on free tiers (Vercel + Render + Neon + Upstash). The backend spins down after 15 minutes of inactivity — if a page feels slow on first load, that's the free-tier API waking up (10–30s), not a bug.
+
+---
+
+## Seed Credentials
+
+> **Demo Notice**
+>
+> This project uses seeded demo accounts for evaluation. These accounts are for testing only and contain non-sensitive sample data.
+
+| Role | Email | Password |
+|------|-------|----------|
+| Student | `student.lisa@test.com` | `password` |
+| Mentor | `mentor.rajesh@test.com` | `password` |
+| Admin | `admin@rankscript.com` | `password` |
+
+> **Note**
+>
+> - The backend is deployed on Render's free tier and automatically sleeps after **15 minutes** of inactivity.
+> - The first login or API request may take **10–30 seconds** while the backend wakes up.
+> - If login appears slow initially, please wait a few seconds and try again.
+
 
 ---
 
