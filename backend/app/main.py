@@ -174,7 +174,7 @@ app.include_router(admin.router)
 
 @app.get("/")
 def root():
-    return {"message": "RankScript API is running! 🚀", "docs": "/docs", "version": "1.0.0"}
+    return {"message": "RankScript API is running!", "docs": "/docs", "version": "1.0.0"}
 
 
 @app.get("/debug/cors")
