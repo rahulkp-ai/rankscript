@@ -24,6 +24,7 @@ export default function Navbar() {
     { href: "/admin/dashboard",    label: "Dashboard" },
     { href: "/admin/leaderboard",  label: "🏆 Leaderboard" },
     { href: "/admin/approvals",    label: "Approvals" },
+    { href: "/admin/audit-log",    label: "Audit Log" },
   ];
 
   const links =
